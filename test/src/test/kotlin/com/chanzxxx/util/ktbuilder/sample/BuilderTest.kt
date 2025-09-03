@@ -1,11 +1,10 @@
 package com.chanzxxx.util.ktbuilder.sample
 
-import com.chazxxx.util.ktbuilder.Company
-import com.chazxxx.util.ktbuilder.Person
-import com.chazxxx.util.ktbuilder.PersonBuilder
-import com.chazxxx.util.ktbuilder.ktBuilderFor
+import com.chanzxxx.util.ktbuilder.processor.ktBuilderFor
+import com.chazxxx.util.ktbuilder.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class BuilderTest {
 
@@ -35,11 +34,29 @@ class BuilderTest {
     fun `builder extension test 2`() {
         val company = ktBuilderFor(Company::class)
             .name("wow")
+            .money(Money(1000))
             .build()
 
         assertEquals("wow", company.name)
     }
 
+    @Test
+    fun `when a non-nullable field is absent`() {
+        assertThrows<IllegalArgumentException> {
+            val company = ktBuilderFor(Company::class)
+                .name("wow2")
+                .build()
+        }
+    }
+
+    @Test
+    fun `when a nullable field is absent`() {
+        assertDoesNotThrow {
+            val company = ktBuilderFor(Company::class)
+                .name("wow2")
+                .build()
+        }
+    }
 
     @Test
     fun `builder should allow multiple build calls with different values`() {

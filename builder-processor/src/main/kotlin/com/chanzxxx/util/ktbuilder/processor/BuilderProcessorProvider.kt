@@ -6,6 +6,6 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 
 internal class BuilderProcessorProvider: SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        return BuilderProcessor(environment.codeGenerator)
+        return BuilderProcessor(environment.codeGenerator, environment.logger)
     }
 }

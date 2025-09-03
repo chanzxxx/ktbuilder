@@ -1,30 +1,57 @@
 package com.chanzxxx.util.ktbuilder.processor
 
-import com.google.devtools.ksp.processing.CodeGenerator
-import com.google.devtools.ksp.processing.Dependencies
-import com.google.devtools.ksp.processing.Resolver
-import com.google.devtools.ksp.processing.SymbolProcessor
+import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.validate
 
-internal class BuilderProcessor(private val codeGenerator: CodeGenerator): SymbolProcessor {
+internal class BuilderProcessor(private val codeGenerator: CodeGenerator,
+                                private val kspLogger: KSPLogger): SymbolProcessor {
+    companion object {
+        var round = 0
+    }
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        val context = ProcessorContext()
         val symbols = resolver.getSymbolsWithAnnotation(KtBuilder::class.qualifiedName!!)
         val result = symbols.filter { !it.validate() }
 
         symbols.forEach { symbol ->
             if (symbol is KSClassDeclaration) {
-                generateBuilderClass(symbol)
+                generateBuilderClass(context, symbol)
             }
         }
+
+        if (context.extensions.isNotEmpty()) {
+            val extensionFile = codeGenerator.createNewFile(Dependencies(false), "com.chanzxxx.util.ktbuilder.processor", "GeneratedExtensions$round")
+
+            extensionFile.bufferedWriter().use { writer ->
+                writer.write("package com.chanzxxx.util.ktbuilder.processor\n")
+                writer.write("import kotlin.reflect.KClass\n")
+
+                context.extensions.forEach { extension ->
+                    writer.write("fun ktBuilderFor(clazz: KClass<${extension.className}>) = ${extension.builderClassName}()\n")
+                }
+            }
+        }
+
+        round++
         return result.toList()
     }
 
-    private fun generateBuilderClass(classDeclaration: KSClassDeclaration) {
+    private fun builderClassName(classDeclaration: KSClassDeclaration): String {
+        if (classDeclaration.parentDeclaration == null
+            || classDeclaration.parentDeclaration !is KSClassDeclaration) {
+            return "${classDeclaration.simpleName.asString()}Builder"
+        }
+
+        val parentClass = classDeclaration.parentDeclaration as KSClassDeclaration
+        return "${parentClass.simpleName.asString()}${classDeclaration.simpleName.asString()}Builder"
+    }
+
+    private fun generateBuilderClass(context: ProcessorContext, classDeclaration: KSClassDeclaration) {
         val packageName = classDeclaration.packageName.asString()
-        val className = classDeclaration.simpleName.asString()
-        val builderClassName = "${className}Builder"
+        val builderClassName = builderClassName(classDeclaration)
+        val classFullName = classDeclaration.qualifiedName?.asString() ?: return
 
         val file = codeGenerator.createNewFile(Dependencies(false), packageName, builderClassName)
         file.bufferedWriter().use { writer ->
@@ -46,8 +73,17 @@ internal class BuilderProcessor(private val codeGenerator: CodeGenerator): Symbo
                 writer.write("    }\n")
             }
 
-            writer.write("    fun build(): $className {\n")
-            writer.write("        return $className(\n")
+            writer.write("    fun build(): $classFullName {\n")
+            classDeclaration.getAllProperties().forEach { property ->
+                if (property.type.resolve().isMarkedNullable) {
+                    return@forEach
+                }
+
+                val propName = property.simpleName.asString()
+                writer.write("        requireNotNull(${propName})\n")
+            }
+
+            writer.write("        return $classFullName(\n")
             classDeclaration.getAllProperties().forEach { property ->
                 val propName = property.simpleName.asString()
                 writer.write("            $propName!!,\n")
@@ -57,12 +93,6 @@ internal class BuilderProcessor(private val codeGenerator: CodeGenerator): Symbo
             writer.write("}\n")
         }
 
-        val extensionFile = codeGenerator.createNewFile(Dependencies(false), packageName, "${builderClassName}Extensions")
-
-        extensionFile.bufferedWriter().use { writer ->
-            writer.write("package $packageName\n")
-            writer.write("import kotlin.reflect.KClass\n")
-            writer.write("fun ktBuilderFor(clazz: KClass<$className>) = $builderClassName()\n")
-        }
+        context.addExtension(classFullName, "$packageName.$builderClassName")
     }
 }
