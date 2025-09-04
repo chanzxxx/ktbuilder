@@ -33,7 +33,7 @@ publishing {
 
             groupId = "com.chanzxxx.util"
             artifactId = "ktbuilder"
-            version = "0.1.0"
+            version = "0.1.1"
 
             pom {
                 name.set("Your Library")
