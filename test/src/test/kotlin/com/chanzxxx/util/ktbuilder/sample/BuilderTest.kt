@@ -44,7 +44,7 @@ class BuilderTest {
     fun `when a non-nullable field is absent`() {
         assertThrows<IllegalArgumentException> {
             val company = ktBuilderFor(Company::class)
-                .name("wow2")
+                .money(Money(1000))
                 .build()
         }
     }

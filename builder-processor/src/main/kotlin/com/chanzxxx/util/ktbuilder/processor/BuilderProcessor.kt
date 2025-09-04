@@ -86,7 +86,11 @@ internal class BuilderProcessor(private val codeGenerator: CodeGenerator,
             writer.write("        return $classFullName(\n")
             classDeclaration.getAllProperties().forEach { property ->
                 val propName = property.simpleName.asString()
-                writer.write("            $propName!!,\n")
+                if (property.type.resolve().isMarkedNullable) {
+                    writer.write("            $propName,\n")
+                } else {
+                    writer.write("            $propName!!,\n")
+                }
             }
             writer.write("        )\n")
             writer.write("    }\n")
